@@ -4,8 +4,6 @@
 
 SVBONER is a standalone Windows app that bridges [PHD2](https://openphdguiding.org/) (open-source astrophotography autoguiding software) with the [Buttplug.io](https://buttplug.io/) protocol, allowing you to map your guiding session's real-time telemetry — guide error, star loss events, and more — to vibration intensity on a connected wireless toy.
 
-The name is a crude play on the astronomy brand SVBONY. It is not affiliated with SVBONY in any way.
-
 ---
 
 ## Status
@@ -55,7 +53,7 @@ Before running SVBONER you need three things running:
 
 ## Safety & Consent
 
-- **Consent is mandatory.** All parties must be informed and consenting before use.
+- **Consent is, of course, mandatory.** All parties must be informed and consenting before use.
 - The app defaults to output **disabled** on startup. You must explicitly enable it each session.
 - The **STOP** button is always visible and immediately kills all output.
 - The master intensity cap defaults to 80% — raise it deliberately, not accidentally.

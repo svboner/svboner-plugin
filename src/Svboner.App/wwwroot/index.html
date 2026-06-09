@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SVBONER</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0d1117;
+      --surface:  #161b22;
+      --border:   #30363d;
+      --text:     #e6edf3;
+      --muted:    #8b949e;
+      --accent:   #58a6ff;
+      --green:    #3fb950;
+      --yellow:   #d29922;
+      --red:      #f85149;
+      --radius:   8px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 14px;
+      min-height: 100vh;
+      padding: 24px 16px;
+    }
+
+    h1 { font-size: 22px; letter-spacing: 0.05em; color: var(--accent); }
+    h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 12px; }
+    h3 { font-size: 14px; margin-bottom: 8px; }
+
+    .layout { max-width: 900px; margin: 0 auto; display: grid; gap: 16px; }
+
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding-bottom: 16px; border-bottom: 1px solid var(--border);
+    }
+    .tagline { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    /* PANIC button */
+    #btn-panic {
+      background: var(--red); color: #fff; border: none; border-radius: var(--radius);
+      padding: 10px 24px; font-size: 15px; font-weight: 700; cursor: pointer;
+      letter-spacing: 0.05em; transition: opacity .15s;
+    }
+    #btn-panic:hover { opacity: 0.85; }
+
+    /* Cards */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+
+    /* Status pills */
+    .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .status-item { display: flex; align-items: center; gap: 8px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+    .dot.ok  { background: var(--green); }
+    .dot.err { background: var(--red); }
+
+    /* Gauge */
+    .gauge-wrap { margin-top: 8px; }
+    .gauge-bar {
+      height: 20px; background: var(--border); border-radius: 4px; overflow: hidden;
+    }
+    .gauge-fill {
+      height: 100%; width: 0%; background: var(--accent);
+      transition: width .2s ease, background .2s; border-radius: 4px;
+    }
+    .gauge-fill.burst { background: var(--red); }
+    .gauge-label { font-size: 12px; color: var(--muted); margin-top: 4px; text-align: right; }
+
+    /* Metrics row */
+    .metrics-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; margin-top: 8px; }
+    .metric { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px; }
+    .metric-label { font-size: 10px; color: var(--muted); text-transform: uppercase; }
+    .metric-value { font-size: 18px; font-weight: 600; margin-top: 2px; }
+
+    /* Guide state badge */
+    .state-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 12px; font-weight: 600;
+      background: var(--border); color: var(--text);
+    }
+    .state-badge.guiding  { background: #1a4c2a; color: var(--green); }
+    .state-badge.lostlock { background: #4c1a1a; color: var(--red); }
+    .state-badge.paused   { background: #4c3a1a; color: var(--yellow); }
+
+    /* Form elements */
+    label { display: block; margin-bottom: 4px; color: var(--muted); font-size: 12px; }
+    select, input[type=number], input[type=text] {
+      width: 100%; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text); padding: 6px 8px; font-size: 13px;
+    }
+    select:focus, input:focus { outline: 2px solid var(--accent); border-color: transparent; }
+
+    input[type=range] { width: 100%; accent-color: var(--accent); }
+
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .form-grid.three { grid-template-columns: 1fr 1fr 1fr; }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+
+    .toggle-row { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
+    .toggle-row label { margin: 0; color: var(--text); font-size: 13px; }
+
+    /* Trigger rules */
+    .trigger-list { display: flex; flex-direction: column; gap: 8px; }
+    .trigger-rule {
+      display: grid; grid-template-columns: auto 1fr 1fr 1fr auto; gap: 10px; align-items: center;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px;
+    }
+    .trigger-rule select, .trigger-rule input { background: var(--surface); }
+
+    /* Buttons */
+    .btn {
+      padding: 7px 16px; border-radius: 6px; border: 1px solid var(--border);
+      background: var(--surface); color: var(--text); cursor: pointer; font-size: 13px;
+      transition: background .15s;
+    }
+    .btn:hover { background: var(--border); }
+    .btn.primary { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
+    .btn.primary:hover { opacity: 0.85; }
+    .btn.sm { padding: 4px 10px; font-size: 12px; }
+    .btn.danger { background: transparent; border-color: var(--red); color: var(--red); }
+    .btn.danger:hover { background: #4c1a1a; }
+
+    .output-row { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+    .output-row .btn { min-width: 120px; }
+
+    /* Section spacing */
+    section.card + section.card { /* gap handled by .layout */ }
+
+    /* Checkbox */
+    input[type=checkbox] { accent-color: var(--accent); width: 16px; height: 16px; flex-shrink: 0; }
+
+    .range-row { display: flex; align-items: center; gap: 8px; }
+    .range-row input[type=number] { width: 70px; }
+    .range-row input[type=range]  { flex: 1; }
+  </style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- Header -->
+  <header>
+    <div>
+      <h1>SVBONER</h1>
+      <div class="tagline">PHD2 → Buttplug.io bridge &nbsp;·&nbsp; adults only</div>
+    </div>
+    <button id="btn-panic" onclick="panic()">⏹ STOP ALL</button>
+  </header>
+
+  <!-- Status & live readout -->
+  <section class="card">
+    <h2>Status</h2>
+    <div class="status-grid">
+      <div class="status-item">
+        <div id="dot-phd2" class="dot"></div>
+        <span id="lbl-phd2">PHD2: connecting…</span>
+      </div>
+      <div class="status-item">
+        <div id="dot-intiface" class="dot"></div>
+        <span id="lbl-intiface">Intiface: connecting…</span>
+      </div>
+      <div class="status-item" style="gap:8px">
+        <span style="color:var(--muted);font-size:12px">Guide state:</span>
+        <span id="state-badge" class="state-badge">Unknown</span>
+      </div>
+      <div class="status-item" style="gap:8px">
+        <span style="color:var(--muted);font-size:12px">Output:</span>
+        <span id="lbl-output-state" style="font-weight:600">Disabled</span>
+      </div>
+    </div>
+
+    <div class="gauge-wrap" style="margin-top:16px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="font-size:12px;color:var(--muted)">Vibration intensity</span>
+        <span id="lbl-intensity" style="font-size:12px;color:var(--text)">0%</span>
+      </div>
+      <div class="gauge-bar"><div id="gauge-fill" class="gauge-fill"></div></div>
+    </div>
+
+    <div id="metrics-grid" class="metrics-grid" style="margin-top:12px"></div>
+
+    <div class="output-row">
+      <button id="btn-enable" class="btn primary" onclick="enableOutput()">Enable Output</button>
+      <button id="btn-disable" class="btn danger" onclick="disableOutput()" style="display:none">Disable Output</button>
+    </div>
+  </section>
+
+  <!-- Device picker -->
+  <section class="card">
+    <h2>Device</h2>
+    <div class="field">
+      <label for="sel-device">Connected vibrating devices</label>
+      <select id="sel-device" onchange="selectDevice(this.value)">
+        <option value="">— scanning… —</option>
+      </select>
+    </div>
+    <p id="lbl-no-devices" style="color:var(--muted);font-size:12px;margin-top:8px;display:none">
+      No vibrating devices found. Make sure Intiface Central is running and your device is paired.
+    </p>
+  </section>
+
+  <!-- Continuous mapping -->
+  <section class="card">
+    <h2>Continuous Mapping</h2>
+    <p style="color:var(--muted);font-size:12px;margin-bottom:12px">
+      Maps a live PHD2 signal to vibration intensity in real time.
+    </p>
+
+    <div class="toggle-row">
+      <input type="checkbox" id="ck-cont-enabled" onchange="saveConfig()">
+      <label for="ck-cont-enabled">Enable continuous mapping</label>
+    </div>
+
+    <div class="form-grid" style="margin-top:10px">
+      <div class="field">
+        <label for="sel-source">Signal source</label>
+        <select id="sel-source" onchange="saveConfig()">
+          <option value="rmsArcsec">RMS Error (arcsec) — recommended</option>
+          <option value="totalErrorArcsec">Total Error (arcsec)</option>
+          <option value="raErrorArcsec">RA Error (arcsec)</option>
+          <option value="decErrorArcsec">Dec Error (arcsec)</option>
+          <option value="avgDistArcsec">Avg Distance (arcsec)</option>
+          <option value="snr">SNR</option>
+          <option value="hfd">HFD (pixels)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="in-smoothing">Smoothing (0 = instant, 0.9 = very smooth)</label>
+        <div class="range-row">
+          <input type="range" id="sl-smoothing" min="0" max="0.95" step="0.05" oninput="syncSmoothing(this.value)" onchange="saveConfig()">
+          <input type="number" id="in-smoothing" min="0" max="0.95" step="0.05" style="width:64px" oninput="syncSmoothingNum(this.value)" onchange="saveConfig()">
+        </div>
+      </div>
+    </div>
+
+    <div class="form-grid three" style="margin-top:12px">
+      <div class="field">
+        <label>Input low (→ output low)</label>
+        <input type="number" id="in-input-low" min="0" step="0.1" onchange="saveConfig()">
+      </div>
+      <div class="field">
+        <label>Input high (→ output high)</label>
+        <input type="number" id="in-input-high" min="0" step="0.1" onchange="saveConfig()">
+      </div>
+      <div class="field"><!-- spacer --></div>
+      <div class="field">
+        <label>Output low % (at input low)</label>
+        <input type="number" id="in-output-low" min="0" max="100" step="1" onchange="saveConfig()">
+      </div>
+      <div class="field">
+        <label>Output high % (at input high)</label>
+        <input type="number" id="in-output-high" min="0" max="100" step="1" onchange="saveConfig()">
+      </div>
+      <div class="field" style="justify-content:flex-end;padding-top:18px;font-size:11px;color:var(--muted)">
+        Set Output Low &gt; High for inverse mapping
+      </div>
+    </div>
+  </section>
+
+  <!-- Event triggers -->
+  <section class="card">
+    <h2>Event Triggers</h2>
+    <p style="color:var(--muted);font-size:12px;margin-bottom:12px">
+      Each trigger fires a timed vibration burst that overrides the continuous mapping.
+    </p>
+    <div id="trigger-list" class="trigger-list"></div>
+    <button class="btn sm" style="margin-top:10px" onclick="addTrigger()">+ Add trigger</button>
+  </section>
+
+  <!-- Global settings -->
+  <section class="card">
+    <h2>Global Settings</h2>
+    <div class="form-grid">
+      <div class="field">
+        <label>Master max intensity %</label>
+        <div class="range-row">
+          <input type="range" id="sl-master-max" min="0" max="100" step="1" oninput="syncMasterMax(this.value)" onchange="saveConfig()">
+          <input type="number" id="in-master-max" min="0" max="100" step="1" style="width:64px" oninput="syncMasterMaxNum(this.value)" onchange="saveConfig()">
+        </div>
+      </div>
+      <div class="field">
+        <label>Ramp rate per second (0 = unlimited)</label>
+        <input type="number" id="in-ramp-rate" min="0" step="0.1" onchange="saveConfig()">
+      </div>
+      <div class="field">
+        <label>Update throttle (ms)</label>
+        <input type="number" id="in-throttle" min="0" step="10" onchange="saveConfig()">
+      </div>
+      <div class="field">
+        <label>RMS window (guide frames)</label>
+        <input type="number" id="in-rms-window" min="1" step="1" onchange="saveConfig()">
+      </div>
+    </div>
+
+    <div class="toggle-row" style="margin-top:12px">
+      <input type="checkbox" id="ck-only-guiding" onchange="saveConfig()">
+      <label for="ck-only-guiding">Only vibrate while PHD2 is actively guiding</label>
+    </div>
+
+    <h3 style="margin-top:20px;margin-bottom:8px;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em">Connection</h3>
+    <div class="form-grid">
+      <div class="field">
+        <label>PHD2 host</label>
+        <input type="text" id="in-phd2-host" onchange="saveConfig()">
+      </div>
+      <div class="field">
+        <label>PHD2 port</label>
+        <input type="number" id="in-phd2-port" onchange="saveConfig()">
+      </div>
+      <div class="field" style="grid-column:span 2">
+        <label>Intiface Central WebSocket URL</label>
+        <input type="text" id="in-intiface-url" onchange="saveConfig()">
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+// ── SignalR connection ────────────────────────────────────────────────────────
+const conn = new signalR.HubConnectionBuilder()
+  .withUrl("/hub")
+  .withAutomaticReconnect()
+  .build();
+
+conn.on("StatusUpdate", applyStatus);
+
+async function startHub() {
+  try { await conn.start(); } catch(e) {
+    setTimeout(startHub, 3000);
+  }
+}
+startHub();
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let config = null;
+let lastStatus = null;
+
+// ── Boot: load config, wire UI ────────────────────────────────────────────────
+(async () => {
+  try {
+    const r = await fetch("/api/config");
+    config = await r.json();
+    populateFromConfig(config);
+  } catch(e) {
+    console.error("Failed to load config", e);
+  }
+})();
+
+// ── Status update handler ─────────────────────────────────────────────────────
+function applyStatus(s) {
+  lastStatus = s;
+
+  // PHD2 connection
+  const phd2ok = s.phd2Connected;
+  dot("dot-phd2", phd2ok);
+  el("lbl-phd2").textContent = phd2ok
+    ? `PHD2: connected`
+    : `PHD2: ${s.phd2Error ?? "disconnected"}`;
+
+  // Intiface connection
+  const intok = s.intifaceConnected;
+  dot("dot-intiface", intok);
+  el("lbl-intiface").textContent = intok
+    ? `Intiface: connected`
+    : `Intiface: ${s.intifaceError ?? "disconnected"}`;
+
+  // Guide state
+  const badge = el("state-badge");
+  const state = s.guideState ?? "unknown";
+  badge.textContent = state;
+  badge.className = "state-badge " + state.toLowerCase();
+
+  // Output enabled
+  const enabled = s.outputEnabled;
+  el("lbl-output-state").textContent = enabled ? "Enabled" : "Disabled";
+  el("lbl-output-state").style.color = enabled ? "var(--green)" : "var(--muted)";
+  el("btn-enable").style.display  = enabled ? "none" : "";
+  el("btn-disable").style.display = enabled ? "" : "none";
+
+  // Gauge
+  const pct = Math.round((s.outputIntensity ?? 0) * 100);
+  const fill = el("gauge-fill");
+  fill.style.width = pct + "%";
+  fill.className   = "gauge-fill" + (s.burstActive ? " burst" : "");
+  el("lbl-intensity").textContent = pct + "%";
+
+  // Metrics
+  if (s.metrics) {
+    renderMetrics(s.metrics);
+  }
+
+  // Devices
+  renderDevices(s.devices ?? [], s.selectedDeviceIndex);
+}
+
+function renderMetrics(m) {
+  const items = [
+    ["RMS",      fmt(m.rmsArcsec,    2), '"'],
+    ["Total",    fmt(m.totalErrorArcsec, 2), '"'],
+    ["RA",       fmt(m.raErrorArcsec,   2), '"'],
+    ["Dec",      fmt(m.decErrorArcsec,  2), '"'],
+    ["AvgDist",  fmt(m.avgDistArcsec,  2), '"'],
+    ["SNR",      fmt(m.snr,            1), ''],
+    ["HFD",      fmt(m.hfd,            2), 'px'],
+  ];
+  el("metrics-grid").innerHTML = items.map(([lbl, val, unit]) => `
+    <div class="metric">
+      <div class="metric-label">${lbl}</div>
+      <div class="metric-value">${val}<span style="font-size:12px;color:var(--muted)">${unit}</span></div>
+    </div>`).join("");
+}
+
+function renderDevices(devices, selectedIndex) {
+  const vibrators = devices.filter(d => d.canVibrate);
+  const sel = el("sel-device");
+  const noDevEl = el("lbl-no-devices");
+
+  const prevVal = sel.value;
+  sel.innerHTML = vibrators.length === 0
+    ? '<option value="">— scanning… —</option>'
+    : '<option value="">— use first available —</option>' +
+      vibrators.map(d =>
+        `<option value="${d.index}"${d.index == selectedIndex ? ' selected' : ''}>${d.name}</option>`
+      ).join("");
+
+  noDevEl.style.display = vibrators.length === 0 ? "" : "none";
+
+  // Re-select if the previously selected value still exists.
+  if (prevVal && [...sel.options].some(o => o.value === prevVal)) sel.value = prevVal;
+}
+
+// ── Config → UI population ────────────────────────────────────────────────────
+function populateFromConfig(c) {
+  const g  = c.global;
+  const cm = c.continuous;
+
+  el("ck-cont-enabled").checked = cm.enabled;
+  el("sel-source").value        = cm.source;
+  el("in-input-low").value      = cm.inputLow;
+  el("in-input-high").value     = cm.inputHigh;
+  el("in-output-low").value     = Math.round(cm.outputLow * 100);
+  el("in-output-high").value    = Math.round(cm.outputHigh * 100);
+  el("sl-smoothing").value      = cm.smoothing;
+  el("in-smoothing").value      = cm.smoothing;
+
+  el("sl-master-max").value     = Math.round(g.masterMaxIntensity * 100);
+  el("in-master-max").value     = Math.round(g.masterMaxIntensity * 100);
+  el("in-ramp-rate").value      = g.rampRatePerSecond;
+  el("in-throttle").value       = g.updateThrottleMs;
+  el("in-rms-window").value     = g.rmsWindowFrames;
+  el("ck-only-guiding").checked = g.onlyWhileGuiding;
+  el("in-phd2-host").value      = g.phd2Host;
+  el("in-phd2-port").value      = g.phd2Port;
+  el("in-intiface-url").value   = g.intifaceUrl;
+
+  renderTriggerList(c.triggers ?? []);
+}
+
+// ── UI → Config save ──────────────────────────────────────────────────────────
+async function saveConfig() {
+  if (!config) return;
+
+  config.continuous.enabled    = el("ck-cont-enabled").checked;
+  config.continuous.source     = el("sel-source").value;
+  config.continuous.inputLow   = parseFloat(el("in-input-low").value)  || 0;
+  config.continuous.inputHigh  = parseFloat(el("in-input-high").value) || 2;
+  config.continuous.outputLow  = (parseFloat(el("in-output-low").value)  || 0) / 100;
+  config.continuous.outputHigh = (parseFloat(el("in-output-high").value) || 100) / 100;
+  config.continuous.smoothing  = parseFloat(el("in-smoothing").value) || 0;
+
+  config.global.masterMaxIntensity = (parseFloat(el("in-master-max").value) || 80) / 100;
+  config.global.rampRatePerSecond  = parseFloat(el("in-ramp-rate").value) ?? 2;
+  config.global.updateThrottleMs   = parseInt(el("in-throttle").value)   || 100;
+  config.global.rmsWindowFrames    = parseInt(el("in-rms-window").value)  || 30;
+  config.global.onlyWhileGuiding   = el("ck-only-guiding").checked;
+  config.global.phd2Host           = el("in-phd2-host").value;
+  config.global.phd2Port           = parseInt(el("in-phd2-port").value) || 4400;
+  config.global.intifaceUrl        = el("in-intiface-url").value;
+
+  config.triggers = readTriggers();
+
+  try {
+    const r = await fetch("/api/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(config)
+    });
+    config = await r.json();
+  } catch(e) {
+    console.error("Failed to save config", e);
+  }
+}
+
+// ── Triggers ──────────────────────────────────────────────────────────────────
+const TRIGGER_EVENTS = [
+  { value: "starLost",        label: "Star Lost" },
+  { value: "alertError",      label: "PHD2 Alert (error)" },
+  { value: "alertWarning",    label: "PHD2 Alert (warning)" },
+  { value: "settleFailed",    label: "Settle Failed" },
+  { value: "guidingStopped",  label: "Guiding Stopped" },
+  { value: "lockPositionLost",label: "Lock Position Lost" },
+  { value: "calibrationFailed", label: "Calibration Failed" },
+];
+
+function renderTriggerList(triggers) {
+  const list = el("trigger-list");
+  list.innerHTML = "";
+  triggers.forEach((t, i) => list.appendChild(buildTriggerRow(t, i)));
+}
+
+function addTrigger() {
+  if (!config) return;
+  config.triggers.push({ enabled: true, event: "starLost", intensity: 1.0, durationMs: 3000 });
+  renderTriggerList(config.triggers);
+  saveConfig();
+}
+
+function removeTrigger(i) {
+  if (!config) return;
+  config.triggers.splice(i, 1);
+  renderTriggerList(config.triggers);
+  saveConfig();
+}
+
+function buildTriggerRow(t, i) {
+  const row = document.createElement("div");
+  row.className = "trigger-rule";
+  row.innerHTML = `
+    <input type="checkbox" ${t.enabled ? "checked" : ""} onchange="triggerChanged()">
+    <div class="field" style="margin:0">
+      <label style="font-size:10px">Event</label>
+      <select onchange="triggerChanged()">${TRIGGER_EVENTS.map(e =>
+        `<option value="${e.value}"${e.value===t.event?' selected':''}>${e.label}</option>`
+      ).join("")}</select>
+    </div>
+    <div class="field" style="margin:0">
+      <label style="font-size:10px">Intensity %</label>
+      <input type="number" min="0" max="100" step="1" value="${Math.round(t.intensity*100)}" onchange="triggerChanged()">
+    </div>
+    <div class="field" style="margin:0">
+      <label style="font-size:10px">Duration (ms)</label>
+      <input type="number" min="100" step="100" value="${t.durationMs}" onchange="triggerChanged()">
+    </div>
+    <button class="btn sm danger" onclick="removeTrigger(${i})">✕</button>
+  `;
+  return row;
+}
+
+function triggerChanged() {
+  config.triggers = readTriggers();
+  saveConfig();
+}
+
+function readTriggers() {
+  return [...el("trigger-list").querySelectorAll(".trigger-rule")].map(row => {
+    const inputs = row.querySelectorAll("input, select");
+    return {
+      enabled:    inputs[0].checked,
+      event:      inputs[1].value,
+      intensity:  (parseFloat(inputs[2].value) || 100) / 100,
+      durationMs: parseInt(inputs[3].value) || 3000,
+    };
+  });
+}
+
+// ── Device selection ──────────────────────────────────────────────────────────
+async function selectDevice(val) {
+  if (!config) return;
+  config.global.selectedDeviceIndex = val === "" ? null : parseInt(val);
+  await saveConfig();
+}
+
+// ── Output enable/disable ─────────────────────────────────────────────────────
+async function enableOutput()  { await fetch("/api/output/enable",  { method: "POST" }); }
+async function disableOutput() { await fetch("/api/output/disable", { method: "POST" }); }
+async function panic()         { await fetch("/api/panic",          { method: "POST" }); }
+
+// ── Range sync helpers ────────────────────────────────────────────────────────
+function syncSmoothing(v)      { el("in-smoothing").value = v; }
+function syncSmoothingNum(v)   { el("sl-smoothing").value = v; }
+function syncMasterMax(v)      { el("in-master-max").value = v; }
+function syncMasterMaxNum(v)   { el("sl-master-max").value = v; }
+
+// ── Util ──────────────────────────────────────────────────────────────────────
+function el(id) { return document.getElementById(id); }
+function dot(id, ok) { el(id).className = "dot " + (ok ? "ok" : "err"); }
+function fmt(v, d) { return v != null ? v.toFixed(d) : "—"; }
+</script>
+</body>
+</html>
